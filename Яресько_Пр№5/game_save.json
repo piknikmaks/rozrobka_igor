@@ -1,0 +1,14 @@
+{
+  "player_name": "Артем",
+  "level": 1,
+  "coins": 1,
+  "hp": 1,
+  "wins": 0,
+  "defeats": 0,
+  "inventory": {
+    "Дерев'яний щит": 1
+  },
+  "settings": {
+    "difficulty": "normal"
+  }
+}
