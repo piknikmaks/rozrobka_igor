@@ -278,6 +278,7 @@ while True:
     print("4. Перевірити готовність до битви.")
     print("5. Взяти участь у великій битві.")
     print("6. Викликати на дуель.")
+    print("7. Вийти.")
 
     choice = str(input("\nОберіть пункт: ")).strip()
 
@@ -343,8 +344,7 @@ while True:
                 print("\nНевірний вибір.")
                 continue
     elif choice == "7":
-        print(last_save)
-        input("Натисніть Enter для продовження....")
+        break
     else:
         print("Невірний вибір")
         input("Натисніть Enter для продовження....")
@@ -356,5 +356,15 @@ while True:
         player.clear()
         continue
     else:
+        choice = str(input("\nЗберегти прогрес? (y / n): ")).strip().lower()
+        
+        try:
+            if choice == "y":
+                last_save = save_state(player)
+            else:
+                break
+        except ValueError:
+                print("\nНевірний вибір.")
+                continue
         break
 input("Натисніть Enter для закриття програми.")

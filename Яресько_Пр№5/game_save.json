@@ -1,13 +1,11 @@
 {
-  "player_name": "Артем",
+  "player_name": "Max",
   "level": 1,
-  "coins": 1,
+  "coins": 14,
   "hp": 1,
   "wins": 0,
   "defeats": 0,
-  "inventory": {
-    "Дерев'яний щит": 1
-  },
+  "inventory": {},
   "settings": {
     "difficulty": "normal"
   }
