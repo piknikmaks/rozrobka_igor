@@ -1,15 +1,50 @@
 import os
 import time
 import msvcrt
+import pygame
 from storage import save_state, load_state
+import window
 
-last_save = None
+DEFAULT_STATE = {
+    "player_name": "",
+    "level": 1,
+    "coins": 0,
+    "hp": 1,
+    "wins": 0,
+    "defeats": 0,
+    "inventory": {},
+    "settings": {"difficulty": "normal"}
+}
 
 class System:
-    def clear(self):
-        os.system("cls")
+    def __init__(self, width=800, height=600, title="Clicker game"):
+        pygame.init()
+        self.screen = pygame.display.set_mode((width, height))
+        pygame.display.set_caption(title)
+        
+        icon = pygame.image.load('img/click_logo.png')
+        pygame.display.set_icon(icon)
+        
+        self.clock = pygame.time.Clock()
+        self.running = True
+        self.fps = 60
+        self.bg_color = (222, 247, 255)
 
-class Character(System):
+    def handle_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+        return self.running
+
+    def update_display(self):
+        self.screen.fill(self.bg_color)
+        pygame.display.flip()
+        self.clock.tick(self.fps)
+
+    def cleanup(self):
+        pygame.quit()
+
+class Character:
     def __init__(self, name="Name", money=0, level=1, hp=1, wins=0, defeats=0, inv=None):
         self.name = name
         self.money = money
@@ -39,35 +74,35 @@ class Character(System):
     def big_battle(self):
         if self.hp > 50:
             self.wins += 1
-            player.clear()
+            self.clear()
             self.stats()
             print("\nПеремога!")
-            last_save = save_state(player)
+            save_state(self)
         elif self.hp > 30:
             self.wins += 1
             self.hp -= 30
-            player.clear()
+            self.clear()
             self.stats()
             print("\nПеремога, але ви отримали рани")
             print(f"Поточний HP: {self.hp}")
-            last_save = save_state(player)
+            save_state(self)
         elif self.hp <= 30:
             self.defeats += 1
             self.money = 0
             self.hp = 1
-            player.clear()
+            self.clear()
             self.stats()
             print("\nПоразка...")
-            last_save = save_state(player)
+            save_state(self)
     
     def shop(self):
         while True:     
-            player.clear()
-            player.stats()       
+            self.clear()
+            self.stats()       
             print("\nДоступні товари:")
             available_count = 0
-            for key, item in shop_products.items():
-                if item.price <= player.money:
+            for key, item in SHOP_PRODUCTS.items():
+                if item.price <= self.money:
                     print(f"{key}. {item.name} — {item.price} монет")
                     available_count += 1
 
@@ -76,8 +111,8 @@ class Character(System):
                 break
             
             shop_choice = int(input("\nВведіть ID товару, який хочете купити:\n"))
-            player.buy_item(shop_choice)
-            last_save = save_state(player)
+            self.buy_item(shop_choice)
+            save_state(self)
 
             print(f"\nУ вас лишилось {self.money} монет")
             
@@ -87,14 +122,17 @@ class Character(System):
                 continue
             break
 
+    def clear(self):
+        os.system("cls")
+
 class Player(Character):
     def add_money(self):        
         self.money += int(self.level * 1.5)
 
     def buy_item(self, item_id):
-        player.clear()
-        player.stats()
-        item = shop_products.get(item_id)
+        self.clear()
+        self.stats()
+        item = SHOP_PRODUCTS.get(item_id)
         if item and self.money >= item.price:
             self.money -= item.price
             
@@ -113,8 +151,8 @@ class Player(Character):
 
     def use_item(self):
         while True:
-            player.clear()
-            player.stats()
+            self.clear()
+            self.stats()
 
             potions = [
                 (item, count) for item, count in self.inv.items()
@@ -147,7 +185,7 @@ class Player(Character):
             except ValueError:
                 print("Будь ласка, введвіть число.")
             
-            last_save = save_state(player)
+            save_state(self)
             
             choice = input("\nЧи хочете ви використати ще зілля? (y / n):\n").strip().lower()
             if choice == "y":
@@ -164,6 +202,15 @@ class Player(Character):
 
         total_damage = base_damage + weapon_damage
         return total_damage
+    
+    def calculate_reduction(self):
+        shield_reduction = 0
+
+        for item, count in self.inv.items():
+            if isinstance(item, Shield):
+                shield_reduction += item.block * count
+                
+        return shield_reduction
 
 class Enemy(Character):
     def __init__(self, name, hp, damage, money_drop, lvl_drop):
@@ -183,9 +230,10 @@ class Enemy(Character):
         print(f"\nБій почався! {player.name} нападає на {self.name}!")
         
         while self.hp > 0 and player.hp > 0:
-            damage_to_enemy = self.calculate_damage()
-            self.hp -= damage_to_enemy
-            print(f"Ви вдарили {self.name} на {damage_to_enemy}! У нього залишилось {self.hp}.")
+            shield_block = self.calculate_reduction()
+            player_damage = self.calculate_damage()
+            self.hp -= player_damage
+            print(f"Ви вдарили {self.name} на {player_damage}! У нього залишилось {self.hp}.")
         
             if self.hp <= 0:
                 print(f"\nВи перемогли!")
@@ -194,8 +242,13 @@ class Enemy(Character):
                 player.wins += 1
                 return True
             
-            player.hp -= self.damage
-            print(f"{self.name} вдарив вас на {self.damage}! У вас залишилось {player.hp}.")
+            enemy_damage = self.damage - shield_block
+            
+            if enemy_damage < 1:
+                enemy_damage = 0
+            
+            player.hp -= enemy_damage
+            print(f"{self.name} вдарив вас на {enemy_damage}! У вас залишилось {player.hp}.")
             
             if player.hp <= 0:
                 print(f"\nВи програли....")
@@ -229,18 +282,7 @@ class Potion(Item):
         super().__init__(name, price)
         self.heal = heal
 
-default_state = {
-    "player_name": "",
-    "level": 1,
-    "coins": 0,
-    "hp": 1,
-    "wins": 0,
-    "defeats": 0,
-    "inventory": {},
-    "settings": {"difficulty": "normal"}
-}
-
-enemies = [
+ENEMIES = [
     Enemy("Слимак", 20, 5, 5, 1),
     Enemy("Скелет", 40, 10, 20, 2),
     Enemy("Дикий кабан", 60, 12, 35, 3),
@@ -254,134 +296,155 @@ enemies = [
     Enemy("Рицар Смерті", 1000, 85, 5000, 500)
 ]
 
-shop_products = {
+SHOP_PRODUCTS = {
     1: Weapon("Іржавий ніж", 25, 5),
     2: Weapon("Залізний меч", 100, 25),
     3: Weapon("Палаючий дворучник", 500, 150),
     
     4: Shield("Стара кришка", 20, 2),
     5: Shield("Дерев'яний щит", 50, 10),
-    6: Shield("Лицарський баклер", 125, 30), #Щити не працюють
+    6: Shield("Лицарський баклер", 125, 30),
     
     7: Potion("Мале зілля", 15, 15),
     8: Potion("Зілля лікування", 40, 40),
     9: Potion("Еліксир відновлення", 100, 100)
 }
 
-player = Player()
+def main():
+    pygame_system = System(800, 600, "Clicker Game")
+    
+    player = Player()
+    current_state = load_state("game_save.json", DEFAULT_STATE)
 
-current_state = load_state("game_save.json", default_state)
+    player.name = current_state["player_name"]
+    player.money = current_state["coins"]
+    player.level = current_state["level"]
+    player.hp = current_state["hp"]
+    player.wins = current_state["wins"]
+    player.inv = current_state["inventory"]
+    
+    while pygame_system.running:
+        pygame_system.handle_events()
+        pygame_system.screen.fill((222, 247, 255))
 
-player.name = current_state["player_name"]
-player.money = current_state["coins"]
-player.level = current_state["level"]
-player.hp = current_state["hp"]
-player.wins = current_state["wins"]
-player.inv = current_state["inventory"]
+        window.draw_rect(pygame_system.screen, (0, 0, 0))
 
-if not player.name:
-    u_name = str(input("\nВітаємо, введіть своє ім'я: "))
-    player.name = u_name
+        pygame.display.flip()
+        pygame_system.clock.tick(60)
 
-print(f"Ласкаво просимо, {player.name}!\n")
+    '''
+    if not player.name:
+        u_name = str(input("\nВітаємо, введіть своє ім'я: "))
+        player.name = u_name
 
-while True:
-    player.stats()
+    print(f"Ласкаво просимо, {player.name}!\n")
 
-    print("\nВи можете:")
-    print("1. Заробити гроші.")
-    print("2. Використати витратні матеріали.")
-    print("3. Скористатися магазином.")
-    print("4. Перевірити готовність до битви.")
-    print("5. Взяти участь у великій битві.")
-    print("6. Викликати на дуель.")
-    print("7. Вийти.")
-
-    choice = str(input("\nОберіть пункт: ")).strip()
-
-    if choice == "1":
-        while True:
-            player.clear()
-            player.stats()
-            print(f"\nНатискайте Enter, щоб заробити {int(player.level*1.5)} монет; exit - щоб вийти\n")
-            add_money = input("\n").strip()
-            
-            if add_money == "exit":
-                last_save = save_state(player)
-                break
-            else:
-                while msvcrt.kbhit():
-                    msvcrt.getch()
-
-                player.add_money()
-                time.sleep(0.1)
-                continue
-    elif choice == "2":
-        player.clear()
-        player.stats()
-        player.use_item()
-    elif choice == "3":
-        player.clear()
-        player.stats()
-        player.shop()
-    elif choice == "4":
-        player.clear()
-        player.stats()
-        player.check_char()
-    elif choice == "5":
-        player.clear()
-        player.stats()
-        player.big_battle()
-    elif choice == "6":
-        player.clear()
-        player.stats()
+    while True:
+        if not pygame_system.handle_events():
+            break
         
-        print("\nВсі доступні вороги:")
-        
-        for i, enemy in enumerate(enemies, 1):
-            print(f"{i}. {enemy.enemy_info()}")
+        pygame_system.update_display()
+        window.draw_rect(pygame_system.screen, (0, 0, 0))
+        player.stats()
 
-        print("\nЗверніть увагу, якщо ви програєте дуель ви втратите всі монети та HP")
-        while True:
-            try:
-                e_choice = int(input("\nВведіть номер ворога: "))
-                if 1 <= e_choice <= len(enemies):
-                    selected_enemy = enemies[e_choice - 1]
-                    
-                    player.clear()
-                    player.stats()
-                    
-                    print(f"\nВи викликали на бій: {selected_enemy.name}!")
-                    selected_enemy.fight(player)
-                    last_save = save_state(player)
+        print("\nВи можете:")
+        print("1. Заробити гроші.")
+        print("2. Використати витратні матеріали.")
+        print("3. Скористатися магазином.")
+        print("4. Перевірити готовність до битви.")
+        print("5. Взяти участь у великій битві.")
+        print("6. Викликати на дуель.")
+        print("7. Вийти.")
+
+        choice = str(input("\nОберіть пункт: ")).strip()
+
+        if choice == "1":
+            while True:
+                player.clear()
+                player.stats()
+                print(f"\nНатискайте Enter, щоб заробити {int(player.level*1.5)} монет; exit - щоб вийти\n")
+                add_money = input("\n").strip()
+                
+                if add_money == "exit":
+                    save_state(player)
                     break
                 else:
-                    raise ValueError("\nНеіснуючий номер.")
-            except ValueError:
-                print("\nНевірний вибір.")
-                continue
-    elif choice == "7":
-        break
-    else:
-        print("Невірний вибір")
-        input("Натисніть Enter для продовження....")
-        player.clear()
-        continue
+                    while msvcrt.kbhit():
+                        msvcrt.getch()
 
-    back = input("\nПовернутися в меню? (y / n): ").strip().lower()
-    if back == "y":
-        player.clear()
-        continue
-    else:
-        choice = str(input("\nЗберегти прогрес? (y / n): ")).strip().lower()
-        
-        try:
-            if choice == "y":
-                last_save = save_state(player)
-            else:
-                break
-        except ValueError:
-                print("\nНевірний вибір.")
-                continue
-        break
-input("Натисніть Enter для закриття програми.")
+                    player.add_money()
+                    time.sleep(0.1)
+                    continue
+        elif choice == "2":
+            player.clear()
+            player.stats()
+            player.use_item()
+        elif choice == "3":
+            player.clear()
+            player.stats()
+            player.shop()
+        elif choice == "4":
+            player.clear()
+            player.stats()
+            player.check_char()
+        elif choice == "5":
+            player.clear()
+            player.stats()
+            player.big_battle()
+        elif choice == "6":
+            player.clear()
+            player.stats()
+            
+            print("\nВсі доступні вороги:")
+            
+            for i, enemy in enumerate(ENEMIES, 1):
+                print(f"{i}. {enemy.enemy_info()}")
+
+            print("\nЗверніть увагу, якщо ви програєте дуель ви втратите всі монети та HP")
+            while True:
+                try:
+                    e_choice = int(input("\nВведіть номер ворога: "))
+                    if 1 <= e_choice <= len(ENEMIES):
+                        selected_enemy = ENEMIES[e_choice - 1]
+                        
+                        player.clear()
+                        player.stats()
+                        
+                        print(f"\nВи викликали на бій: {selected_enemy.name}!")
+                        selected_enemy.fight(player)
+                        save_state(player)
+                        break
+                    else:
+                        raise ValueError("\nНеіснуючий номер.")
+                except ValueError:
+                    print("\nНевірний вибір.")
+                    continue
+        elif choice == "7":
+            break
+        else:
+            print("Невірний вибір")
+            input("Натисніть Enter для продовження....")
+            player.clear()
+            continue
+
+        back = input("\nПовернутися в меню? (y / n): ").strip().lower()
+        if back == "y":
+            player.clear()
+            continue
+        else:
+            choice = str(input("\nЗберегти прогрес? (y / n): ")).strip().lower()
+
+            try:
+                if choice == "y":
+                    save_state(player)
+                else:
+                    break
+            except ValueError:
+                    print("\nНевірний вибір.")
+                    continue
+            break'''
+    pygame_system.cleanup()
+    input("Натисніть Enter для закриття програми....")
+
+if __name__ == "__main__":
+    main()
