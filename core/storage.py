@@ -1,6 +1,17 @@
 import json
 import os
 
+DEFAULT_STATE = {
+    "player_name": "",
+    "level": 1,
+    "coins": 0,
+    "hp": 1,
+    "wins": 0,
+    "defeats": 0,
+    "inventory": {},
+    "settings": {"difficulty": "normal"}
+}
+
 def save_state(player):
     path = "game_save.json"
     tmp_path = path + ".tmp"
