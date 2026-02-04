@@ -1,6 +1,7 @@
 import os
 import time
 import msvcrt
+from core.storage import save_state
 
 class Character:
     def __init__(self, name="Name", money=0, level=1, hp=1, wins=0, defeats=0, inv=None):

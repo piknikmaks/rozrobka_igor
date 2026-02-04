@@ -28,6 +28,9 @@ class Window:
     def cleanup(self):
         pygame.quit()
 
+    def clear(self):
+        self.screen.fill(self.bg_color)
+
 def draw_rect(surface, color=(0, 0, 0)):
     rect = pygame.Rect(0, 0, 795, 25)
     pygame.draw.rect(surface, color, rect)

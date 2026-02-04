@@ -42,4 +42,4 @@ class Game:
     def draw(self):
         self.window.clear()
         self.screens[self.state].draw(self.window.screen)
-        self.window.flip()
+        # self.window.flip()

@@ -1,5 +1,6 @@
 import pygame
 import core.player
+from ui.widgets import Button
 
 player = core.player.Player
 
@@ -25,6 +26,8 @@ class MenuScreen:
         for b in self.buttons:
             b.draw(surface)
 
+    def update(self):
+        pass
 # class MenuScreen:
 #     def money_status():
 #         font = pygame.font.SysFont('Arial', 36)
